@@ -1,0 +1,11 @@
+{% extends "base.html.twig" %}
+
+{% block body %}
+    <div {{ react_component('Login', {
+        userData: userData,
+        entryPoint: path('api_entrypoint')
+    }) }}>
+
+    </div>
+{% endblock %}
+
