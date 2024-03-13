@@ -3,8 +3,13 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Link;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Put;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -19,12 +24,27 @@ use Symfony\Component\Validator\Constraints as Assert;
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
 #[ApiResource(
+    operations: [
+        new Get(),
+        new GetCollection(),
+        new Post(
+            security: 'is_granted("PUBLIC_ACCESS")'
+        ),
+        new Put(
+            security: 'is_granted("ROLE_USER_EDIT")'
+        ),
+        new Patch(
+            security: 'is_granted("ROLE_USER_EDIT")'
+        ),
+        new Delete()
+    ],
     normalizationContext: [
         'groups' => ['user:read']
     ],
     denormalizationContext: [
         'groups' => ['user:write']
     ],
+    security: 'is_granted("ROLE_USER")'
 )]
 #[UniqueEntity(fields: 'email', message: "Cet email est déjà utilisé.")]
 #[UniqueEntity(fields: 'username', message: "Ce nom d\'utilisateur est déjà pris.")]
@@ -42,6 +62,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     normalizationContext: [
         'groups' => ['user:read']
     ],
+    security: 'is_granted("ROLE_USER")'
 )]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
@@ -83,6 +104,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: ApiToken::class, mappedBy: 'ownedBy')]
     private Collection $apiTokens;
 
+    /* Scopes given during API authentication */
+    private ?array $accessTokenScopes = null;
+
     public function __construct()
     {
         $this->dragonTreasures = new ArrayCollection();
@@ -123,7 +147,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function getRoles(): array
     {
-        $roles = $this->roles;
+        if (null === $this->accessTokenScopes) {
+            $roles = $this->roles;
+            $roles[] = 'ROLE_FULL_USER';
+        } else {
+            $roles = $this->accessTokenScopes;
+        }
+
         // guarantee every user at least has ROLE_USER
         $roles[] = 'ROLE_USER';
 
@@ -234,5 +264,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         }
 
         return $this;
+    }
+
+    public function markAsTokenAuthenticated(array $scopes)
+    {
+        $this->accessTokenScopes = $scopes;
     }
 }

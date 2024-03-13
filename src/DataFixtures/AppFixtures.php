@@ -34,9 +34,6 @@ class AppFixtures extends Fixture
         });
 
         //test token is tcp_{token.locator}.251651ec82ed5144bd2e
-        ApiTokenFactory::new()->afterInstantiate(function (ApiToken $token) {
-            $user = UserFactory::random()->object();
-            $token->createToken($user, $this->hasher, '251651ec82ed5144bd2e');
-        })->createMany(30);
+        ApiTokenFactory::createMany(30);
     }
 }

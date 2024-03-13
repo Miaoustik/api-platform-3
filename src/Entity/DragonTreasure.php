@@ -34,13 +34,19 @@ use function Symfony\Component\String\u;
             ]
         ),
         new GetCollection(),
-        new Post(),
-        new Put(),
-        new Patch(),
+        new Post(
+            security: 'is_granted("ROLE_TREASURE_CREATE")'
+        ),
+        new Put(
+            security: 'is_granted("ROLE_TREASURE_EDIT")'
+        ),
+        new Patch(
+            security: 'is_granted("ROLE_TREASURE_EDIT")'
+        ),
     ],
     formats: [
-        'json',
         'jsonld',
+        'json',
         'csv' => 'text/csv'
     ],
     normalizationContext: [

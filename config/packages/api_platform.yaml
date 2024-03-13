@@ -9,7 +9,7 @@ api_platform:
         jsonopenapi: ['application/vnd.openapi+json']
         html: ['text/html']
     defaults:
-        stateless: true
+        stateless: false
         cache_headers:
             vary: ['Content-Type', 'Authorization', 'Origin']
         extra_properties:
@@ -19,6 +19,7 @@ api_platform:
     keep_legacy_inflector: false
     swagger:
         api_keys:
+            # Overridden in OpenApiDecorator
             access_token:
                 name: Authorization
                 type: header

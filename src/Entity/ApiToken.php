@@ -45,10 +45,20 @@ class ApiToken
     #[ORM\Column(length: 255)]
     private ?string $locator = null;
 
+    private ?string $tokenString = null;
+
+    /**
+     * @return string|null
+     */
+    public function getTokenString(): ?string
+    {
+        return $this->tokenString;
+    }
+
     /**
      * @param string $tokenType
      * Don't forget to call createToken method after creating a new ApiToken or doctrine will explode.
-     * createToken will return the plain text token, u have to save it somewhere as you can't see it anymore.
+     * createToken will store the plain text token temporally in tokenString, u have to save it somewhere as you can't see it anymore.
      */
     public function __construct(string $tokenType = self::PERSONAL_ACCESS_TOKEN_PREFIX)
     {
@@ -115,9 +125,9 @@ class ApiToken
      * @return string
      * @throws \Exception
      * Don't forget to call createToken method after creating a new ApiToken or doctrine will explode.
-     * createToken will return the plain text token, u have to save it somewhere as you can't see it anymore.
+     * createToken will store the plain text token temporally in tokenString, u have to save it somewhere as you can't see it anymore.
      */
-    public function createToken(User $user, UserPasswordHasherInterface $hasher, string $randomString = null): string
+    public function createToken(User $user, UserPasswordHasherInterface $hasher, string $randomString = null): void
     {
         if ($this->token) {
             throw new \LogicException('Token for this entity is already created.');
@@ -128,7 +138,7 @@ class ApiToken
         $this->ownedBy = $user;
         $this->locator = $user->getId().'-'.bin2hex(random_bytes(5));
 
-        return $this->tokenType.$this->locator.'.'.$string;
+        $this->tokenString = $this->tokenType.$this->locator.'.'.$string;
     }
 
     public function isValid(): bool

@@ -36,7 +36,7 @@ final class ApiTokenFactory extends ModelFactory
      *
      * @todo inject services if required
      */
-    public function __construct()
+    public function __construct(private readonly UserPasswordHasherInterface $hasher)
     {
         parent::__construct();
     }
@@ -63,7 +63,10 @@ final class ApiTokenFactory extends ModelFactory
     protected function initialize(): self
     {
         return $this
-            // ->afterInstantiate(function(ApiToken $apiToken): void {})
+            ->afterInstantiate(function(ApiToken $apiToken): void {
+                $user = $apiToken->getOwnedBy();
+                $apiToken->createToken($user, $this->hasher, '251651ec82ed5144bd2e');
+            })
         ;
     }
 
