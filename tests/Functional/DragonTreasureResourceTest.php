@@ -6,6 +6,7 @@ use App\Entity\ApiToken;
 use App\Factory\ApiTokenFactory;
 use App\Factory\DragonTreasureFactory;
 use App\Factory\UserFactory;
+use Symfony\Component\HttpFoundation\Response;
 use Zenstruck\Browser\HttpOptions;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
@@ -20,7 +21,13 @@ class DragonTreasureResourceTest extends ApiTestCase
 
     public function testGetCollectionOfTreasures(): void
     {
-        DragonTreasureFactory::createMany(5);
+        DragonTreasureFactory::createMany(5, [
+            'isPublished' => true
+        ]);
+
+        DragonTreasureFactory::createOne([
+            'isPublished' => false
+        ]);
 
         $json = $this->browser()
             ->get('/api/treasures')
@@ -42,6 +49,17 @@ class DragonTreasureResourceTest extends ApiTestCase
             "shortDescription",
             "plunderedAtAgo",
         ]);
+    }
+
+    public function testGetTreasureNotPublished404s()
+    {
+        $treasure = DragonTreasureFactory::createOne([
+            'isPublished' => false
+        ]);
+
+        $this->browser()
+            ->get('/api/treasures/'.$treasure->getId())
+            ->assertStatus(Response::HTTP_NOT_FOUND);
     }
 
     public function testGetCollectionOfTreasuresAsAdmin(): void
@@ -76,6 +94,23 @@ class DragonTreasureResourceTest extends ApiTestCase
         ]);
     }
 
+    public function testPatchUnpublishedTreasureWorks()
+    {
+        $user = UserFactory::createOne();
+        $treasure = DragonTreasureFactory::createOne([
+            'isPublished' => false,
+            'owner' => $user
+        ]);
+
+        $this->browser()
+            ->actingAs($user)
+            ->patch("/api/treasures/".$treasure->getId(), HttpOptions::json([
+                'value' => 58885
+            ]))
+            ->assertStatus(Response::HTTP_OK);
+
+    }
+
     public function testGetCollectionOfTreasuresAsOwner(): void
     {
         $user = UserFactory::createOne();
@@ -95,6 +130,7 @@ class DragonTreasureResourceTest extends ApiTestCase
 
         $this->assertCount(5, $decoded['hydra:member']);
         $this->assertSame($decoded['hydra:member'][0]['isPublished'], false);
+        $this->assertSame($decoded['hydra:member'][0]['isMine'], true);
 
         $this->assertSame(array_keys($decoded['hydra:member'][0]), [
             "@id",
@@ -107,6 +143,7 @@ class DragonTreasureResourceTest extends ApiTestCase
             "owner",
             "shortDescription",
             "plunderedAtAgo",
+            "isMine"
         ]);
     }
 
@@ -124,10 +161,9 @@ class DragonTreasureResourceTest extends ApiTestCase
                 'name' => "A treasure",
                 'description' => "Description of a Treasure",
                 'coolFactor' => 5,
-                'value' => 100000,
-                'owner' => '/api/users/'. $user->object()->getId()
+                'value' => 100000
             ]))
-            ->assertStatus(201)
+            ->assertStatus(Response::HTTP_CREATED)
             ->assertJsonMatches('name', "A treasure")
         ;
     }
@@ -150,20 +186,18 @@ class DragonTreasureResourceTest extends ApiTestCase
                 'description' => "Description of a Treasure",
                 'coolFactor' => 5,
                 'value' => 100000,
-                'owner' => '/api/users/'. $user->getId()
             ])->withHeader('Authorization', 'Bearer FOO'))
             ->assertStatus(401)
             ->post('/api/treasures', HttpOptions::json([])
                 ->withHeader('Authorization', 'Bearer '. $token->getTokenString()))
-            ->assertStatus(422)
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY)
             ->post('/api/treasures', HttpOptions::json([
                 'name' => "A treasure",
                 'description' => "Description of a Treasure",
                 'coolFactor' => 5,
-                'value' => 100000,
-                'owner' => '/api/users/'. $user->getId()
+                'value' => 100000
             ])->withHeader('Authorization', 'Bearer '. $token->getTokenString()))
-            ->assertStatus(201)
+            ->assertStatus(Response::HTTP_CREATED)
         ;
     }
 
@@ -182,7 +216,7 @@ class DragonTreasureResourceTest extends ApiTestCase
                 'value' => 100000,
                 'owner' => '/api/users/'. $token->getOwnedBy()->getId()
             ])->withHeader('Authorization', 'Bearer '. $token->getTokenString()))
-            ->assertStatus(403)
+            ->assertStatus(Response::HTTP_FORBIDDEN)
         ;
     }
 
@@ -198,7 +232,7 @@ class DragonTreasureResourceTest extends ApiTestCase
             ->patch('/api/treasures/'.$treasure->getId(), HttpOptions::json([
                 'value' => 12345
             ]))
-            ->assertStatus(200)
+            ->assertStatus(Response::HTTP_OK)
             ->assertJsonMatches('value', 12345);
 
         $user2 = UserFactory::createOne();
@@ -207,7 +241,7 @@ class DragonTreasureResourceTest extends ApiTestCase
             ->patch('/api/treasures/'.$treasure->getId(), HttpOptions::json([
                 'value' => 12345
             ]))
-            ->assertStatus(403);
+            ->assertStatus(Response::HTTP_FORBIDDEN);
 
         $this->browser()
             ->actingAs($user)
@@ -215,7 +249,7 @@ class DragonTreasureResourceTest extends ApiTestCase
                 'value' => 12345,
                 'owner' => '/api/users/'.$user2->object()->getId()
             ]))
-            ->assertStatus(403);
+            ->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
     public function testAdminCanPatchToEditTreasures(): void

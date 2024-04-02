@@ -14,6 +14,8 @@ use ApiPlatform\Metadata\Link;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\DragonTreasureRepository;
+use App\State\DragonTreasureSetOwnerProcessor;
+use App\Validator\IsValidOwner;
 use Carbon\Carbon;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -34,11 +36,11 @@ use function Symfony\Component\String\u;
         ),
         new GetCollection(),
         new Post(
-            security: 'is_granted("ROLE_TREASURE_CREATE")'
+            security: 'is_granted("ROLE_TREASURE_CREATE")',
+            processor: DragonTreasureSetOwnerProcessor::class
         ),
         new Patch(
             security: 'is_granted("EDIT", object)',
-            securityPostDenormalize: 'is_granted("EDIT", object)'
         ),
     ],
     formats: [
@@ -119,6 +121,7 @@ class DragonTreasure
     #[Groups(['treasure:read', 'treasure:write'])]
     #[Assert\Valid]
     #[ApiFilter(SearchFilter::class, strategy: 'exact')]
+    #[IsValidOwner]
     private ?User $owner = null;
 
     public function __construct(string $name = null)

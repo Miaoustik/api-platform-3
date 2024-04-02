@@ -11,8 +11,10 @@ use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\UserRepository;
 use App\State\UserHashPasswordProcessor;
+use App\Validator\TreasuresAllowedOwnerChange;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\Common\Collections\Criteria;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -103,8 +105,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     // if a treasure get owner=null orphan will delete it
     #[ORM\OneToMany(targetEntity: DragonTreasure::class, mappedBy: 'owner', orphanRemoval: true)]
-    #[Groups(['user:read'])]
+    #[Groups(['user:write'])]
     #[Assert\Valid]
+    #[TreasuresAllowedOwnerChange]
     private Collection $dragonTreasures;
 
     #[ORM\OneToMany(targetEntity: ApiToken::class, mappedBy: 'ownedBy')]
@@ -218,6 +221,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getDragonTreasures(): Collection
     {
         return $this->dragonTreasures;
+    }
+
+    #[Groups(['user:read'])]
+    #[SerializedName('dragonTreasures')]
+    public function getPublishedDragonTreasures(): Collection
+    {
+        $criteria = Criteria::create()
+            ->andWhere(Criteria::expr()->eq('isPublished', true))
+            ->orWhere(Criteria::expr()->eq('', null));
+
+        return $this->dragonTreasures->matching($criteria);
     }
 
     public function addDragonTreasure(DragonTreasure $dragonTreasure): static
