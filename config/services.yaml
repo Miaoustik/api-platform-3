@@ -20,5 +20,12 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
+    App\Normalizer\AddOwnerGroupsNormalizer:
+        decorates: 'api_platform.jsonld.normalizer.item'
+
+    'app.serializer.normalizer.item.json':
+        class: 'App\Normalizer\AddOwnerGroupsNormalizer'
+        decorates: 'api_platform.serializer.normalizer.item'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

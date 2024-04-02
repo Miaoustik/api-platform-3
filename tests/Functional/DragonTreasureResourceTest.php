@@ -10,6 +10,9 @@ use Zenstruck\Browser\HttpOptions;
 use Zenstruck\Foundry\Test\Factories;
 use Zenstruck\Foundry\Test\ResetDatabase;
 
+/**
+ * @method AppKernelBrowser browser(array $options = [], array $server = [])
+ */
 class DragonTreasureResourceTest extends ApiTestCase
 {
     use ResetDatabase;
@@ -24,7 +27,11 @@ class DragonTreasureResourceTest extends ApiTestCase
             ->assertJson()
             ->json();
 
-        $this->assertSame(array_keys($json->decoded()['hydra:member'][0]), [
+        $decoded = $json->decoded();
+
+        $this->assertCount(5, $decoded['hydra:member']);
+
+        $this->assertSame(array_keys($decoded['hydra:member'][0]), [
             "@id",
             "@type",
             "name",
@@ -37,9 +44,75 @@ class DragonTreasureResourceTest extends ApiTestCase
         ]);
     }
 
+    public function testGetCollectionOfTreasuresAsAdmin(): void
+    {
+        DragonTreasureFactory::createMany(5, [
+            'isPublished' => false
+        ]);
+        $admin = UserFactory::new()->asAdmin()->create();
+
+        $json = $this->browser()
+            ->actingAs($admin)
+            ->get('/api/treasures')
+            ->assertJson()
+            ->json();
+
+        $decoded = $json->decoded();
+
+        $this->assertCount(5, $decoded['hydra:member']);
+        $this->assertSame($decoded['hydra:member'][0]['isPublished'], false);
+
+        $this->assertSame(array_keys($decoded['hydra:member'][0]), [
+            "@id",
+            "@type",
+            "name",
+            "description",
+            "value",
+            "coolFactor",
+            "isPublished",
+            "owner",
+            "shortDescription",
+            "plunderedAtAgo",
+        ]);
+    }
+
+    public function testGetCollectionOfTreasuresAsOwner(): void
+    {
+        $user = UserFactory::createOne();
+
+        DragonTreasureFactory::createMany(5, [
+            'isPublished' => false,
+            'owner' => $user
+        ]);
+
+        $json = $this->browser()
+            ->actingAs($user)
+            ->get('/api/treasures')
+            ->assertJson()
+            ->json();
+
+        $decoded = $json->decoded();
+
+        $this->assertCount(5, $decoded['hydra:member']);
+        $this->assertSame($decoded['hydra:member'][0]['isPublished'], false);
+
+        $this->assertSame(array_keys($decoded['hydra:member'][0]), [
+            "@id",
+            "@type",
+            "name",
+            "description",
+            "value",
+            "coolFactor",
+            "isPublished",
+            "owner",
+            "shortDescription",
+            "plunderedAtAgo",
+        ]);
+    }
+
     public function testPostToCreateTreasure(): void
     {
-        $user = UserFactory::createOne()->object();
+        $user = UserFactory::createOne();
 
         $this->browser()
             ->actingAs($user)
@@ -52,7 +125,7 @@ class DragonTreasureResourceTest extends ApiTestCase
                 'description' => "Description of a Treasure",
                 'coolFactor' => 5,
                 'value' => 100000,
-                'owner' => '/api/users/'. $user->getId()
+                'owner' => '/api/users/'. $user->object()->getId()
             ]))
             ->assertStatus(201)
             ->assertJsonMatches('name', "A treasure")
@@ -92,5 +165,71 @@ class DragonTreasureResourceTest extends ApiTestCase
             ])->withHeader('Authorization', 'Bearer '. $token->getTokenString()))
             ->assertStatus(201)
         ;
+    }
+
+    public function testPostToCreateTreasureDeniedScopeWithApiToken(): void
+    {
+        /** @var ApiToken $token */
+        $token = ApiTokenFactory::createOne([
+            'scopes' => []
+        ])->object();
+
+        $this->browser()
+            ->post('/api/treasures', HttpOptions::json([
+                'name' => "A treasure",
+                'description' => "Description of a Treasure",
+                'coolFactor' => 5,
+                'value' => 100000,
+                'owner' => '/api/users/'. $token->getOwnedBy()->getId()
+            ])->withHeader('Authorization', 'Bearer '. $token->getTokenString()))
+            ->assertStatus(403)
+        ;
+    }
+
+    public function testPatchToUpdateTreasure(): void
+    {
+        $user = UserFactory::createOne();
+        $treasure = DragonTreasureFactory::createOne([
+            'owner' => $user
+        ]);
+
+        $this->browser()
+            ->actingAs($user)
+            ->patch('/api/treasures/'.$treasure->getId(), HttpOptions::json([
+                'value' => 12345
+            ]))
+            ->assertStatus(200)
+            ->assertJsonMatches('value', 12345);
+
+        $user2 = UserFactory::createOne();
+        $this->browser()
+            ->actingAs($user2)
+            ->patch('/api/treasures/'.$treasure->getId(), HttpOptions::json([
+                'value' => 12345
+            ]))
+            ->assertStatus(403);
+
+        $this->browser()
+            ->actingAs($user)
+            ->patch('/api/treasures/'.$treasure->getId(), HttpOptions::json([
+                'value' => 12345,
+                'owner' => '/api/users/'.$user2->object()->getId()
+            ]))
+            ->assertStatus(403);
+    }
+
+    public function testAdminCanPatchToEditTreasures(): void
+    {
+        $admin = UserFactory::new()->asAdmin()->create();
+
+        $treasure = DragonTreasureFactory::createOne();
+
+        $this->browser()
+            ->actingAs($admin)
+            ->patch('/api/treasures/'. $treasure->object()->getId(), HttpOptions::json([
+                'value' => 456789
+            ]))
+            ->assertStatus(200)
+            ->assertJsonMatches('value', 456789);
     }
 }

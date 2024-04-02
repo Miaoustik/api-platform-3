@@ -6,14 +6,13 @@ use ApiPlatform\Doctrine\Orm\Filter\BooleanFilter;
 use ApiPlatform\Doctrine\Orm\Filter\RangeFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Link;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Put;
-use ApiPlatform\Serializer\Filter\PropertyFilter;
 use App\Repository\DragonTreasureRepository;
 use Carbon\Carbon;
 use Doctrine\DBAL\Types\Types;
@@ -37,11 +36,9 @@ use function Symfony\Component\String\u;
         new Post(
             security: 'is_granted("ROLE_TREASURE_CREATE")'
         ),
-        new Put(
-            security: 'is_granted("ROLE_TREASURE_EDIT")'
-        ),
         new Patch(
-            security: 'is_granted("ROLE_TREASURE_EDIT")'
+            security: 'is_granted("EDIT", object)',
+            securityPostDenormalize: 'is_granted("EDIT", object)'
         ),
     ],
     formats: [
@@ -114,6 +111,7 @@ class DragonTreasure
 
     #[ORM\Column]
     #[ApiFilter(BooleanFilter::class)]
+    #[Groups(['admin:read', 'admin:write', 'owner:read'])]
     private ?bool $isPublished = false;
 
     #[ORM\ManyToOne(inversedBy: 'dragonTreasures')]

@@ -95,7 +95,7 @@ export default function (props) {
                         <div>
                             <label htmlFor="username">Username</label>
                             <input value={username} onChange={(e) => setUsername(e.target.value)} name={'username'} type="text" id={'username'}/>
-                            <Try type={'button'} onClick={handleTryUsername}>jeremie.windler@blanda.com</Try>
+                            <Try type={'button'} onClick={handleTryUsername}>test@test.fr</Try>
                         </div>
                         <div>
                             <label htmlFor="username">Password</label>
