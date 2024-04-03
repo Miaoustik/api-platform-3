@@ -6,7 +6,6 @@ use ApiPlatform\Doctrine\Orm\Filter\BooleanFilter;
 use ApiPlatform\Doctrine\Orm\Filter\RangeFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
-use ApiPlatform\Metadata\ApiProperty;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
@@ -14,9 +13,12 @@ use ApiPlatform\Metadata\Link;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Post;
 use App\Repository\DragonTreasureRepository;
-use App\State\DragonTreasureSetOwnerProcessor;
+use App\State\DragonTreasureStateProcessor;
+use App\State\DragonTreasureStateProvider;
 use App\Validator\IsValidOwner;
 use Carbon\Carbon;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Groups;
@@ -36,8 +38,7 @@ use function Symfony\Component\String\u;
         ),
         new GetCollection(),
         new Post(
-            security: 'is_granted("ROLE_TREASURE_CREATE")',
-            processor: DragonTreasureSetOwnerProcessor::class
+            security: 'is_granted("ROLE_TREASURE_CREATE")'
         ),
         new Patch(
             security: 'is_granted("EDIT", object)',
@@ -54,7 +55,9 @@ use function Symfony\Component\String\u;
     denormalizationContext: [
         'groups' => ['treasure:write']
     ],
-    paginationItemsPerPage: 10
+    paginationItemsPerPage: 10,
+    provider: DragonTreasureStateProvider::class,
+    processor: DragonTreasureStateProcessor::class
 )]
 #[ApiResource(
     uriTemplate: '/users/{user_id}/treasures.{_format}',
@@ -70,7 +73,9 @@ use function Symfony\Component\String\u;
     ],
     normalizationContext: [
         'groups' => ['treasure:read']
-    ]
+    ],
+    provider: DragonTreasureStateProvider::class,
+    processor: DragonTreasureStateProcessor::class
 )]
 #[ApiFilter(SearchFilter::class, properties: ['owner.username' => 'partial'])]
 class DragonTreasure
@@ -113,7 +118,7 @@ class DragonTreasure
 
     #[ORM\Column]
     #[ApiFilter(BooleanFilter::class)]
-    #[Groups(['admin:read', 'admin:write', 'owner:read'])]
+    #[Groups(['admin:read', 'admin:write', 'owner:read', 'treasure:write'])]
     private ?bool $isPublished = false;
 
     #[ORM\ManyToOne(inversedBy: 'dragonTreasures')]
@@ -124,10 +129,16 @@ class DragonTreasure
     #[IsValidOwner]
     private ?User $owner = null;
 
+    private bool $isOwnedByAuthenticatedUser;
+
+    #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'dragonTreasure', orphanRemoval: true)]
+    private Collection $notifications;
+
     public function __construct(string $name = null)
     {
         $this->name = $name;
         $this->plunderedAt = new \DateTimeImmutable();
+        $this->notifications = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -242,4 +253,57 @@ class DragonTreasure
 
         return $this;
     }
+
+    #[Groups(['treasure:read'])]
+    #[SerializedName('isMine')]
+    public function getIsOwnedByAuthenticatedUser(): bool
+    {
+        if (!isset($this->isOwnedByAuthenticatedUser)) {
+            throw new \LogicException("You must call setIsOwnedByAuthenticatedUser() before getIsOwnedByAuthenticatedUser().");
+        }
+
+        return $this->isOwnedByAuthenticatedUser;
+    }
+
+    /**
+     * @param bool $isOwnedByAuthenticatedUser
+     * @return DragonTreasure
+     */
+    public function setIsOwnedByAuthenticatedUser(bool $isOwnedByAuthenticatedUser): DragonTreasure
+    {
+        $this->isOwnedByAuthenticatedUser = $isOwnedByAuthenticatedUser;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Notification>
+     */
+    public function getNotifications(): Collection
+    {
+        return $this->notifications;
+    }
+
+    public function addNotification(Notification $notification): static
+    {
+        if (!$this->notifications->contains($notification)) {
+            $this->notifications->add($notification);
+            $notification->setDragonTreasure($this);
+        }
+
+        return $this;
+    }
+
+    public function removeNotification(Notification $notification): static
+    {
+        if ($this->notifications->removeElement($notification)) {
+            // set the owning side to null (unless already changed)
+            if ($notification->getDragonTreasure() === $this) {
+                $notification->setDragonTreasure(null);
+            }
+        }
+
+        return $this;
+    }
+
+
 }

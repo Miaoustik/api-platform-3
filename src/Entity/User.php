@@ -228,8 +228,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getPublishedDragonTreasures(): Collection
     {
         $criteria = Criteria::create()
-            ->andWhere(Criteria::expr()->eq('isPublished', true))
-            ->orWhere(Criteria::expr()->eq('', null));
+            ->andWhere(Criteria::expr()->eq('isPublished', true));
 
         return $this->dragonTreasures->matching($criteria);
     }

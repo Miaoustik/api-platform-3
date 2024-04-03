@@ -40,13 +40,6 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $this->getEntityManager()->flush();
     }
 
-    public function criteriaFindTreasuresPublishedOrOwned(): Criteria
-    {
-        //TODO: Trier le critere par owner lors d'un get user->getDragonTreasures, écrire le test, car les extension doctrine ne s'y declenche pas sur les queries soujacentes.
-        $criteria = Criteria::create()
-            ->andWhere(Criteria::expr()->eq('isPublished', true))
-            ->orWhere(Criteria::expr()->eq('owner', $this->security->getUser()));
-    }
 
     //    /**
     //     * @return User[] Returns an array of User objects

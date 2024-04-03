@@ -30,9 +30,6 @@ class AddOwnerGroupsNormalizer implements NormalizerInterface, SerializerAwareIn
     {
         if ($object instanceof DragonTreasure && $object->getOwner() === $this->security->getUser()) {
             $context['groups'][] = 'owner:read';
-            $normalized = $this->decorated->normalize($object, $format, $context);
-            $normalized['isMine'] = true;
-            return $normalized;
         }
 
         return $this->decorated->normalize($object, $format, $context);

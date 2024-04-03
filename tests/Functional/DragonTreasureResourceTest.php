@@ -5,6 +5,7 @@ namespace App\Tests\Functional;
 use App\Entity\ApiToken;
 use App\Factory\ApiTokenFactory;
 use App\Factory\DragonTreasureFactory;
+use App\Factory\NotificationFactory;
 use App\Factory\UserFactory;
 use Symfony\Component\HttpFoundation\Response;
 use Zenstruck\Browser\HttpOptions;
@@ -46,6 +47,7 @@ class DragonTreasureResourceTest extends ApiTestCase
             "value",
             "coolFactor",
             "owner",
+            "isMine",
             "shortDescription",
             "plunderedAtAgo",
         ]);
@@ -89,6 +91,7 @@ class DragonTreasureResourceTest extends ApiTestCase
             "coolFactor",
             "isPublished",
             "owner",
+            "isMine",
             "shortDescription",
             "plunderedAtAgo",
         ]);
@@ -141,9 +144,9 @@ class DragonTreasureResourceTest extends ApiTestCase
             "coolFactor",
             "isPublished",
             "owner",
+            "isMine",
             "shortDescription",
             "plunderedAtAgo",
-            "isMine"
         ]);
     }
 
@@ -170,8 +173,6 @@ class DragonTreasureResourceTest extends ApiTestCase
 
     public function testPostToCreateTreasureWithApiToken(): void
     {
-        $user = UserFactory::createOne()->object();
-
         /** @var ApiToken $token */
         $token = ApiTokenFactory::createOne()->object();
 
@@ -265,5 +266,24 @@ class DragonTreasureResourceTest extends ApiTestCase
             ]))
             ->assertStatus(200)
             ->assertJsonMatches('value', 456789);
+    }
+
+    public function testPublishTreasure()
+    {
+        $user = UserFactory::createOne();
+        $treasure = DragonTreasureFactory::createOne([
+            'owner' => $user,
+            'isPublished' => false
+        ]);
+
+        $this->browser()
+            ->actingAs($user)
+            ->patch('/api/treasures/'.$treasure->getId(), HttpOptions::json([
+                'isPublished' => true
+            ]))
+            ->assertStatus(Response::HTTP_OK)
+            ->assertJsonMatches('isPublished', true);
+
+        NotificationFactory::repository()->assert()->count(1);
     }
 }
